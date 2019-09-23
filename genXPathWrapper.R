@@ -1,19 +1,18 @@
 if(FALSE) {
-library(Rllvm)
-m = parseIR("fibOnly.ll")
-source("genXPathWrapper.R")
-m2 = clone(m)
-xp = genXPathWrapper(m2$fib)
+ library(Rllvm)
+ m = parseIR("fibOnly.ll")
+ source("genXPathWrapper.R")
+ m2 = clone(m)
+ xp = genXPathWrapper(m2$fib)
+ 
+ library(XML)
+ llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
 
-library(XML)
-llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
+ ee = ExecutionEngine(m2)
+ xp  = getPointerToFunction(m2$xpathfib, ee)@ref
 
-ee = ExecutionEngine(m2)
-xp  = getPointerToFunction(m2$xpathfib, ee)@ref
-
-
-doc = xmlParse("doc.xml")
-ll = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = xp))
+ doc = xmlParse("doc.xml")
+ ll = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = xp))
 }
 
 genXPathWrapper =
@@ -41,7 +40,6 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
 
      cmp = createICmp(ir, ICMP_EQ, nparams[[2]], ir$createIntegerConstant(length(params), getContext(module)))     
      createCondBr(ir, cmp, bodyBlock, errBlock)
-# browser()
      
      ir$setInsertPoint(bodyBlock)
      args = lapply(params, function(p)
@@ -64,6 +62,13 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
 
 
 createXPathError =
+    #
+    #  Setup error handling code in current block (assumes caller has managed the blocks and
+    #  the IRBuilder so we are in this error block) to call xmlXPathErr(ctxt, errorNum = 12)
+    #  This only handles incorrect number of arguments in call to our wrapped routine.
+    #
+    #  Currently ignores varargs.
+    #
 function(ir, params, numExpected, module, returnBlock, origFunName)
 {
     xmlXPathErr = Function("xmlXPathErr", VoidType, list(pointerType(VoidType), Int32Type), module)
@@ -83,7 +88,7 @@ function(ir, ty, ctxt, module)
        pop = Function("xmlXPathPopNumber", DoubleType, list(pointerType(VoidType)), module = module)
     else if(identical(StringType, ty))
        pop = Function("xmlXPathPopString", pointerType(Int32Type), list(pointerType(VoidType)), module = module)
-    else  #XXX
+    else  #XXX not correct default.
         pop = Function("xmlXPathPopNodeSet", pointerType(Int32Type), list(pointerType(VoidType)), module = module)                
    k = createCall(ir, pop, ctxt)
 
@@ -95,9 +100,16 @@ function(ir, ty, ctxt, module)
 }
 
 pushResult =
+    #
+    # Arrange the call to valuePush(), converting the return value from our wrappee function
+    # to an XPath object.  Currently can handle Boolean, Float and CString, or variants that can be
+    # cast to one of these, e.g., int to Float.
+    #
 function(ir, val, retType, ctxt, module)
 {
-browser()    
+
+      # Determine which xmlXPathNew routine to call to convert the return value from our wrapped routine
+      # to an appropriate XPath object.
     if(identical(retType, Int1Type))
        xnew = Function("xmlXPathNewBoolean", pointerType(VoidType), list(Int32Type), module = module)        
     else if(isIntegerType(retType) || identical(DoubleType, retType))
@@ -109,11 +121,14 @@ browser()
 
     ty = getType(getParameters(xnew)[[1]])
     if(!identical(ty, retType)) {
+        #XXX  make more general
         val = createCast(ir, Rllvm:::SIToFP, val, ty)
     }
-    
+
+     # Create the new XPath object
     xval = createCall(ir, xnew, val)
 
     valuePush = Function("valuePush", Int32Type, list(pointerType(VoidType), pointerType(VoidType)), module = module)
+     # Call valuePush() with the xmlXPath context and the newly created XPath object
     createCall(ir, valuePush, ctxt, xval)
 }
