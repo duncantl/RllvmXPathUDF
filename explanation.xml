@@ -210,7 +210,7 @@ once it is told that the input is an integer (rather than a numeric scalar).
 
 
 <para>
-There are several ways for us to generate the xpathFib() routine in LLVM.
+There are several ways for us to generate the wrapper routine xpathFib()  in LLVM.
 One is that we create an R function that knows all about XPath and the
 available routines, e.g., 
 xmlXPathPopBoolean, xmlXPathPopNumber, xmlXPathPopString, xmlXPathPopNodeSet and xmlXPathPopExternal
@@ -220,12 +220,13 @@ and xmlXPathReturnNumber, etc.
 <para>
 Another approach is that we write the C function as an R function and use
 RLLVMCompile to translate that to LLVM.
-This is probably simplest as it is most general. However, we need to be able to
+This seems simplest as we have RLLVMCompile to translate the R function to LLVM
+and the wrapper routines are very simple. However, we need to be able to
 provide the types of the parameters and return values of each of the routines we reference.
 We can use RCIndex for that.
 </para>
 <para>
-So we can define an R function that mirrors the xpathFib routine:
+Using this approach, we define an R function that mirrors the xpathFib routine:
 <r:function><![CDATA[
 xpathFib = 
 function(ctxt, nargs)
@@ -314,8 +315,12 @@ with
 valuePush(ctxt, xmlXPathNewFloat( fib(num)) )
 </r:code>
 So we are doing what the pre-processor is doing.
-
+And this starts to feel far too involved and not the right approach.
+So let's return to writing a generator function that knows about
+the details of XPath wrapper routines.
 </para>
+
+
 <para>
 Given the nature of the XPath wrapper functions,
 it is perhaps simplest to generate the wrapper routine
@@ -323,13 +328,14 @@ NOT using RLLVMCompile.
 Instead, we'll write a function that takes an R
 function and some type information and generates the
 wrapper function as an LLVM Function. 
-
-
+See <ulink url="genXPathWrapper.R">genXPathWrapper.R</ulink>
 </para>
 
+
 </section>
+
 <section>
-<title></title>
+<title>Generating XPath Wrapper Functions</title>
 
 <para>
 <r:code>
@@ -338,13 +344,20 @@ source("genXPathWrapper.R")
 </para>
 
 <para>
+We load the pre-generated LLVM IR module.
+Then we clone it so that we can work on a separate copy.
 <r:code>
 library(Rllvm)
 m = parseIR("fibOnly.ll")
 m2 = clone(m)
-xp = genXPathWrapper(m2$fib)
-
 </r:code>
+Now we generate the XPath wrapper routine
+<r:code>
+xp = genXPathWrapper(m2$fib)
+</r:code>
+
+Next we load the XML package and its DSO so that we can find the addresses of libxml2
+routines that we use in our XPath wrapper:
 <r:code>
 library(XML)
 llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
@@ -492,6 +505,5 @@ table(log(as.numeric(sapply(getNodeSet(doc, "//value"), xmlValue))) > 3.0)
 
 </section>
 </section>
-
 
 </article>
