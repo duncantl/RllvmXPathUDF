@@ -1,3 +1,7 @@
+CLANG=~/LLVM/9.0.0/llvm-9.0.0.src/build/bin/clang
 
+fibOnly.ll: fibOnly.c
+	$(CLANG) -emit-llvm -S -O2 fibOnly.c -o fibOnly.ll
 
-~/LLVM/9.0.0/llvm-9.0.0.src/build/bin/clang -emit-llvm -S -O2 fibOnly.c -o fibOnly.ll
+%.html: %.xml
+	make -f  ~/GitWorkingArea/XDynDocs/inst/Make/Makefile $@
