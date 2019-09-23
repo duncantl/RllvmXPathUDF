@@ -483,7 +483,7 @@ Function("log", DoubleType, DoubleType, m2)
 mn = genXPathWrapper(m2$log)
 
 library(XML)
-llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush", "log")
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush", "log", "xmlXPathErr")
 </r:code>
 
 Note our new function is called xpathlog and not xpathmylog.
@@ -504,6 +504,53 @@ table(log(as.numeric(sapply(getNodeSet(doc, "//value"), xmlValue))) > 3.0)
 </para>
 
 </section>
+</section>
+
+
+
+
+<section>
+<title>Handling XPath Errors</title>
+<para>
+Here we have added a simple test on the number of arguments passed to our wrapper routine.
+<r:code>
+library(Rllvm)
+m = parseIR("fibOnly.ll")
+m2 = clone(m)
+
+source("genXPathWrapper.R")
+Function("log", DoubleType, DoubleType, m2)
+mn = genXPathWrapper(m2$log)
+
+library(XML)
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush", "log", "xmlXPathErr")
+</r:code>
+
+<r:code>
+ee = ExecutionEngine(m2)
+xp  = getPointerToFunction(mn, ee)@ref
+</r:code>
+
+So we can now use this routine in an XPath query:
+<r:code>
+doc = xmlParse("doc.xml")
+ll = getNodeSet(doc, "//value[ log(number(.), 2) > 3.0 ]", xpathFuns = list(log = xp))
+</r:code>
+This should raise an error include "Xpath error: Invalid number of arguments".
+
+<r:code>
+ll = getNodeSet(doc, "//value[ log() > 3.0 ]", xpathFuns = list(log = xp))
+</r:code>
+</para>
+
+<para>
+This is a different type of potential error but xmlXPathPopNumber takes the node
+and converts it to an number and it makes sense in this case.
+<r:code>
+ll = getNodeSet(doc, "//value[ log(.) > 3.0 ]", xpathFuns = list(log = xp))
+</r:code>
+</para>
+
 </section>
 
 </article>

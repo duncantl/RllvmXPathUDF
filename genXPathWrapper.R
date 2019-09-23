@@ -31,9 +31,19 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
 
      nparams = getParameters(f)
      ctxt = nparams[[1]]
+     nargs = nparams[[2]]
      b = Block(f)
      ir = IRBuilder(b)
 
+     bodyBlock = Block(f)
+     errBlock = Block(f)
+     returnBlock = Block(f)
+
+     cmp = createICmp(ir, ICMP_EQ, nparams[[2]], ir$createIntegerConstant(length(params), getContext(module)))     
+     createCondBr(ir, cmp, bodyBlock, errBlock)
+# browser()
+     
+     ir$setInsertPoint(bodyBlock)
      args = lapply(params, function(p)
                               popArg(ir, getType(p), ctxt, module))
 
@@ -41,10 +51,24 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
      val = createCall(ir, fun, .args = args)
 
      pushResult(ir, val, retType, ctxt, module)
+     ir$createBr(returnBlock)
 
+     ir$setInsertPoint(errBlock)
+     createXPathError(ir, nparams, length(params), module, returnBlock, getName(fun))
+
+     ir$setInsertPoint(returnBlock)
      createReturn(ir)
      
      f
+}
+
+
+createXPathError =
+function(ir, params, numExpected, module, returnBlock, origFunName)
+{
+    xmlXPathErr = Function("xmlXPathErr", VoidType, list(pointerType(VoidType), Int32Type), module)
+    ir$createCall(xmlXPathErr, params[[1]], ir$createIntegerConstant(12L, getContext(module)))
+    ir$createBr(returnBlock)
 }
 
 popArg =
