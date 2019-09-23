@@ -1,11 +1,19 @@
-<doc
+<article
 	 xmlns:omg="http://www.omegahat.org"
-	 xmlns:c="http://www.C.org">
+	 xmlns:c="http://www.C.org"
+	 xmlns:r="http://www.r-project.org"
+	 xmlns:sh="http://www.shell.org">
 
+<title>Compiling and Calling Routines for XPath from R and LLVM</title>
+<author>
+  <firstname>Duncan</firstname>  <surname>Temple Lang</surname>
+  <affiliation>UC Davis</affiliation>
+</author>
 
+<para>
 Consider an artificial example to start.
 We have an XML document  of the form
-<xml:code>
+<xml:code><![CDATA[
 <doc>
 <value>1</value>
 <value>2</value>
@@ -13,7 +21,7 @@ We have an XML document  of the form
 ...
 <value>300</value>
 </doc>
-</xml:code>
+]]></xml:code>
 We want to identify the <xml:tag>value</xml:tag> elements
 for which the value of the fibonacci function is greater than 10
 when we call the fibonacci function with the content of the <xml:tag>value</xml:tag> element.
@@ -29,16 +37,17 @@ In other words, we want to
   determine if the result is greater than 10
 </listitem>
 </itemizedlist>
+</para>
 
-
-
+<para>
 We could do this in R by extracting all of the <xml:tag>value</xml:tag> nodes
 and then extracting their values and computing the  fibonacci number for each
 then filtering the nodes based on those values.
+</para>
 
-
+<para>
 We implement the fibonacci routine in C with
-<c:code>
+<c:code><![CDATA[
 int
 fib(int n)
 {
@@ -47,9 +56,11 @@ fib(int n)
     
     return(fib(n-1) + fib(n-2));
 }
-</c:code>
+]]></c:code>
+</para>
 
 
+<para>
 The XPath interface cannot call this routine directly.
 Instead, we need to marshall the values from the XPath expression to the native C types
 when calling the routine and returning its value.
@@ -66,7 +77,8 @@ xpathFib(xmlXPathParserContextPtr ctxt, int nargs)
 </c:code>
 We compile these two routines into a shared library/DSO
 which we can load into R to make the symbols accessible to R.
-
+</para>
+<para>
 We can then use this in our R XPath calls.
 We first load the XML package, and the newly  created DSO and then
 get the address of the <c:func>xpathFib</c:func> routine:
@@ -75,19 +87,22 @@ library(XML)
 dyn.load("fib.so")
 fib.ptr = getNativeSymbolInfo('xpathFib')$address
 </c:code>
+</para>
 
 
+<para>
 Now we can use this xpathFib routine in a call to getNodeSet(), xpathSApply(), xpathApply(), etc.
 via the <r:arg>xpathFuns</r:arg> parameter.  We provide a list of named elements,
 with the names being those to use in the XPath expression, and the value being
 the address of a native routine or an R function.
-
+</para>
+<para>
 So we can filter our <xml:tag>value</xml:tag> nodes in place with
 <c:code>
 doc = xmlParse("doc.xml")
 cc = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib.ptr))  
 </c:code>
-
+</para>
 
 
 <section>
@@ -164,15 +179,15 @@ cc.tm = system.time(replicate(B, getNodeSet(doc, "//value[ fib(number(.)) > 10 ]
 
 
 <para>
-<r:code>
+<r:code><![CDATA[
 fib = function(n) if(n < 2) n else fib(n-1) + fib(n-2)
 fib(10) # 55
-</r:code>
+]]></r:code>
 
-<r:code>
+<r:code><![CDATA[
 rr = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib))
 identical(rr, cc)
-</r:code>
+]]></r:code>
 
 
 <r:code>
@@ -240,9 +255,10 @@ xmlXPathReturnNumber.
 To get the type of the parameters,
 we read the xpath header files.
 We create a simple xpath.c file
-<c:code>
+<c:code><![CDATA[
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
+]]>
 </c:code>
 
 <r:code>
@@ -280,14 +296,14 @@ This is not listed in the routines.
 <r:code>
 tu2 = createTU("xpath.c", incs, options = RCIndex:::CXTranslationUnit_DetailedPreprocessingRecord)
 </r:code>
-<r:code>
+<r:code><![CDATA[
 k = function() { ans = list(); function(cur, ...) if(getName(cur) == "xmlXPathReturnNumber") ans <<- c(ans, cur)}
 zz = k()
 tu2 = createTU("xpath.c", incs, options = RCIndex:::CXTranslationUnit_DetailedPreprocessingRecord)
 m = environment(zz)$ans[[1]]
 toks = getCursorTokens(m)
 getParams(toks)
-</r:code>
+]]></r:code>
 
 So we would replace
 <r:code>
@@ -311,7 +327,171 @@ wrapper function as an LLVM Function.
 
 </para>
 
+</section>
+<section>
+<title></title>
+
+<para>
+<r:code>
+source("genXPathWrapper.R")
+</r:code>
+</para>
+
+<para>
+<r:code>
+library(Rllvm)
+m = parseIR("fibOnly.ll")
+m2 = clone(m)
+xp = genXPathWrapper(m2$fib)
+
+</r:code>
+<r:code>
+library(XML)
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
+</r:code>
+
+<r:code>
+ee = ExecutionEngine(m2)
+xp  = getPointerToFunction(m2$xpathfib, ee)@ref
+</r:code>
+
+<r:code>
+doc = xmlParse("doc.xml")
+ll = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = xp))
+</r:code>
+</para>
 
 </section>
 
-</doc>
+<section>
+<title>Character Strings</title>
+
+
+<para>
+  Here we write a routine that maps a month number to its name.
+  Then we compare the month name to April.
+  This is not an intelligent way of doing the XPath query. However, it illustrates
+  wrapping a routine that returns a string - <c:type>const char *</c:type>.
+</para>
+
+<para>
+  Again, we write the routine in C and convert it to IR so that we can skip that part.
+  However, we could write an R function such as
+<r:function><![CDATA[
+monthName = function(num) MonthNames[num]
+]]></r:function>
+and then translate that to IR very easily.
+</para>
+
+<para>
+As before, we read the IR and clone the module.  
+<r:code>
+library(Rllvm)
+m = parseIR("fibOnly.ll")
+m2 = clone(m)
+</r:code>
+
+We generate the XPath wrapper routine in the m2 module
+<r:code>
+source("genXPathWrapper.R")
+mn = genXPathWrapper(m2$monthName)
+</r:code>
+
+We load the XML package and its DSO and then register the routines
+the module (m2) uses that come from that DSO:
+<r:code>
+library(XML)
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewCString", "valuePush")
+</r:code>
+
+We create the execution engine/context and find the address in memory of our
+newly created XPath wrapper routineL
+<r:code>
+ee = ExecutionEngine(m2)
+xp  = getPointerToFunction(m2$xpathmonthName, ee)@ref
+</r:code>
+Finally, we pass the address of the routine via the <r:arg>xpathFuns</r:arg> parameter
+and process the <xml:tag>mon</xml:tag> elements in the <xml/> document.
+<r:code>
+doc = xmlParse("doc2.xml")
+ll = getNodeSet(doc, "//mon[ month(number(.)) = 'April' ]", xpathFuns = list(month = xp))
+</r:code>
+
+<r:code>
+ll
+</r:code>
+</para>
+</section>
+
+
+
+<section>
+<title>DoubleType log() routine</title>
+
+<para>
+We wrote log(double val) return(log(val)) in the C code which is infinitely recursive.
+So we we need a name mylog for our implementation of log.
+See below for using the built-in log routine directly.
+</para>
+
+<para>
+<r:code>
+library(Rllvm)
+m = parseIR("fibOnly.ll")
+m2 = clone(m)
+
+source("genXPathWrapper.R")
+mn = genXPathWrapper(m2$mylog)
+
+library(XML)
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
+
+ee = ExecutionEngine(m2)
+xp  = getPointerToFunction(m2$xpathmylog, ee)@ref
+
+doc = xmlParse("doc.xml")
+ll = getNodeSet(doc, "//value[ log(number(.)) > 3.0 ]", xpathFuns = list(log = xp))
+</r:code>
+</para>
+
+
+<section>
+<title>Built-in log() Routine</title>
+<para>
+Here we use the built-in log() function directly.
+So create a wrapper to the libc log routine.
+<r:code>
+library(Rllvm)
+m = parseIR("fibOnly.ll")
+m2 = clone(m)
+
+source("genXPathWrapper.R")
+Function("log", DoubleType, DoubleType, m2)
+mn = genXPathWrapper(m2$log)
+
+library(XML)
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush", "log")
+</r:code>
+
+Note our new function is called xpathlog and not xpathmylog.
+However, we can also pass the returned function from genXPathWrapper() directly
+<r:code>
+ee = ExecutionEngine(m2)
+xp  = getPointerToFunction(m2$xpathlog, ee)@ref
+xp  = getPointerToFunction(mn, ee)@ref
+</r:code>
+So we can now use this routine in an XPath query:
+<r:code>
+doc = xmlParse("doc.xml")
+ll = getNodeSet(doc, "//value[ log(number(.)) > 3.0 ]", xpathFuns = list(log = xp))
+length(ll)
+all(log(as.numeric(sapply(ll, xmlValue))) > 3.0)
+table(log(as.numeric(sapply(getNodeSet(doc, "//value"), xmlValue))) > 3.0)
+</r:code>
+</para>
+
+</section>
+</section>
+
+
+</article>
