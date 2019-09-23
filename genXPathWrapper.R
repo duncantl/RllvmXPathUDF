@@ -24,23 +24,28 @@ genXPathWrapper =
 function(fun, params = getParameters(fun), retType = getReturnType(fun), module = as(fun, "Module"),
           funName = sprintf("xpath%s", getName(fun)))
 {
+       # declare new wrapper routine with 2 parameters xmlXPathContent pointer and int of number of arguments.
      f = Function(funName, VoidType, list(ctxt = pointerType(VoidType), nargs = Int32Type), module = module)
      
-      #XX Add a check for nargs
-
      nparams = getParameters(f)
      ctxt = nparams[[1]]
      nargs = nparams[[2]]
      b = Block(f)
      ir = IRBuilder(b)
 
+      # We have the initial block that determines if the number of arguments is correct. If not, jump to
+      # errBlock which calls xmlXPathErr
+      # Otherwise, jump to the bodyBlock which performs the computations.
+      # And both errBlock and bodyBlock jump to returnBlock to exit the routine.
      bodyBlock = Block(f)
      errBlock = Block(f)
      returnBlock = Block(f)
 
+       # Initial block - compare nargs to expected number of parameters from wrapped routine
      cmp = createICmp(ir, ICMP_EQ, nparams[[2]], ir$createIntegerConstant(length(params), getContext(module)))     
      createCondBr(ir, cmp, bodyBlock, errBlock)
-     
+
+       # create the bodyBlock code
      ir$setInsertPoint(bodyBlock)
      args = lapply(params, function(p)
                               popArg(ir, getType(p), ctxt, module))
@@ -51,9 +56,11 @@ function(fun, params = getParameters(fun), retType = getReturnType(fun), module 
      pushResult(ir, val, retType, ctxt, module)
      ir$createBr(returnBlock)
 
+       # Create the errBlock code.
      ir$setInsertPoint(errBlock)
      createXPathError(ir, nparams, length(params), module, returnBlock, getName(fun))
 
+       # Create the simple returnBlock code which is just return with a void.
      ir$setInsertPoint(returnBlock)
      createReturn(ir)
      
