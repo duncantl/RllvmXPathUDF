@@ -1,0 +1,317 @@
+<doc
+	 xmlns:omg="http://www.omegahat.org"
+	 xmlns:c="http://www.C.org">
+
+
+Consider an artificial example to start.
+We have an XML document  of the form
+<xml:code>
+<doc>
+<value>1</value>
+<value>2</value>
+<value>3</value>
+...
+<value>300</value>
+</doc>
+</xml:code>
+We want to identify the <xml:tag>value</xml:tag> elements
+for which the value of the fibonacci function is greater than 10
+when we call the fibonacci function with the content of the <xml:tag>value</xml:tag> element.
+In other words, we want to
+<itemizedlist>
+<listitem>  
+  get the value of each <xml:tag>value</xml:tag> as a number
+</listitem>
+<listitem>
+  pass it in a call to fib()
+</listitem>
+<listitem>
+  determine if the result is greater than 10
+</listitem>
+</itemizedlist>
+
+
+
+We could do this in R by extracting all of the <xml:tag>value</xml:tag> nodes
+and then extracting their values and computing the  fibonacci number for each
+then filtering the nodes based on those values.
+
+
+We implement the fibonacci routine in C with
+<c:code>
+int
+fib(int n)
+{
+    if(n < 2)
+	return(n);
+    
+    return(fib(n-1) + fib(n-2));
+}
+</c:code>
+
+
+The XPath interface cannot call this routine directly.
+Instead, we need to marshall the values from the XPath expression to the native C types
+when calling the routine and returning its value.
+So we would write a little wrapper routine that expects the XPath expression to have provided a number
+in the call
+<c:code>
+void
+xpathFib(xmlXPathParserContextPtr ctxt, int nargs)
+{
+    float num = xmlXPathPopNumber(ctxt);
+    int val = fib((int) num);
+    xmlXPathReturnNumber(ctxt, val);
+}
+</c:code>
+We compile these two routines into a shared library/DSO
+which we can load into R to make the symbols accessible to R.
+
+We can then use this in our R XPath calls.
+We first load the XML package, and the newly  created DSO and then
+get the address of the <c:func>xpathFib</c:func> routine:
+<c:code>
+library(XML)
+dyn.load("fib.so")
+fib.ptr = getNativeSymbolInfo('xpathFib')$address
+</c:code>
+
+
+Now we can use this xpathFib routine in a call to getNodeSet(), xpathSApply(), xpathApply(), etc.
+via the <r:arg>xpathFuns</r:arg> parameter.  We provide a list of named elements,
+with the names being those to use in the XPath expression, and the value being
+the address of a native routine or an R function.
+
+So we can filter our <xml:tag>value</xml:tag> nodes in place with
+<c:code>
+doc = xmlParse("doc.xml")
+cc = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib.ptr))  
+</c:code>
+
+
+
+<section>
+<title>LLVM</title>
+
+<para>
+  Now that we have seen how we could make the fibonacci routine available to XPath
+  in C, we will mimic this using LLVM.
+  We will not discuss how we generated the LLVM version of fib and xpathFib.
+  That is discussed in the LLVM compilation chapter and package.
+  For now, we can just take a short-cut and convert the fib.c C file we wrote into IR with
+<sh:code>
+clang -emit-llvm -S -O2 fib.c -o fib.ll `xml2-config --cflags`
+</sh:code>
+</para>
+
+
+<para>
+We want to do essentially the analogous steps we did for the C code.
+We want to load the xpathFib routine. We load the Rllvm package
+and parse the fib.ll module.
+<r:code>
+library(Rllvm)
+m = parseIR("fib.ll")
+</r:code>
+When we created the .so, we linked the compiled C code with the libxml2 library.
+However, here we haven't done a linking step. So we have references in our
+xpathFib routine to routines xmlXPathPopNumber, xmlXPathNewFloat and valuePush
+that are in libxml2. These are available via the XML.so from the XML R package.
+So we can find the addresses of these and provide them to LLVM to essentially do the linking:
+<r:code>
+llvmAddSymbol("xmlXPathPopNumber", "xmlXPathNewFloat", "valuePush")
+</r:code>  
+</para>
+
+
+<para>
+  Again, since we haven't explicitly linked code, we have to provide LLVM with a run-time engine or context.
+<r:code>
+ee = ExecutionEngine(m)
+</r:code>
+As we did with the C code, we get the address of the xpathFib routine, but this time in the LLVM module:
+<r:code>
+llfib.ptr = getPointerToFunction(m$xpathFib, ee)@ref
+</r:code>
+We can pass this routine address via the <r:arg>xpathFuns</r:arg> parameter  of <r:func>getNodeSet</r:func>
+as we did for the C code
+<r:code>
+ll = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = llfib.ptr))
+</r:code>
+</para>
+
+
+<para>
+<r:code>
+identical(sapply(cc, xmlValue), sapply(ll, xmlValue))
+</r:code>
+cc and ll are identical if run on the same instance of doc.
+</para>
+
+</section>
+
+<section>
+<title></title>
+
+<para>
+
+<r:code>
+B = 30
+ll.tm = system.time(replicate(B, getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = llfib.ptr))))
+cc.tm = system.time(replicate(B, getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib.ptr))  ))
+</r:code>
+</para>
+
+
+<para>
+<r:code>
+fib = function(n) if(n < 2) n else fib(n-1) + fib(n-2)
+fib(10) # 55
+</r:code>
+
+<r:code>
+rr = getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib))
+identical(rr, cc)
+</r:code>
+
+
+<r:code>
+rr.tm = system.time(replicate(B, getNodeSet(doc, "//value[ fib(number(.)) > 10 ]", xpathFuns = list(fib = fib))  ))
+rr.tm/ll.tm
+</r:code>
+Giving a factor of 158.
+</para>
+
+</section>
+
+
+<section>
+<title>Compiling <c:func>fib</c:func> and <c:func>xpathFib</c:func></title>
+
+<para>
+The <omg:pkg>RLLVMCompile</omg:pkg> package can handle the simple fib() function
+once it is told that the input is an integer (rather than a numeric scalar).
+</para>
+
+
+<para>
+There are several ways for us to generate the xpathFib() routine in LLVM.
+One is that we create an R function that knows all about XPath and the
+available routines, e.g., 
+xmlXPathPopBoolean, xmlXPathPopNumber, xmlXPathPopString, xmlXPathPopNodeSet and xmlXPathPopExternal
+and xmlXPathReturnNumber, etc.
+</para>
+
+<para>
+Another approach is that we write the C function as an R function and use
+RLLVMCompile to translate that to LLVM.
+This is probably simplest as it is most general. However, we need to be able to
+provide the types of the parameters and return values of each of the routines we reference.
+We can use RCIndex for that.
+</para>
+<para>
+So we can define an R function that mirrors the xpathFib routine:
+<r:function><![CDATA[
+xpathFib = 
+function(ctxt, nargs)
+{
+   num = xmlXPathPopNumber(ctxt) 
+   xmlXPathReturnNumber(ctxt, fib( num ))
+}
+]]></r:function>  
+This calls <c:func>xmlXPathPopNumber</c:func> and <c:func>xmlXPathReturnNumber</c:func>.
+So we need the signatures for both of these.
+If we can find the signature of these,
+then we can (almost) infer the type of xpathFib.
+We see the use of ctxt in the call to xmlXPathReturnNumber, so
+that defines the type of the ctxt parameter in xpathFib.
+The nargs paramter is never used, so we can't determine the type.
+However, perhaps we should add a check in the function that nargs == 1 or nargs > 0
+and that would allow us to infer the type.
+</para>
+<para>
+We'll see that xmlXPathReturnNumber is a macro that calls valuePush().
+That returns an int value. However, our xpathFib routine should return a void.
+So we would tell RLLVMCompile to have it return void and not the value from
+xmlXPathReturnNumber.
+</para>
+
+<para>
+To get the type of the parameters,
+we read the xpath header files.
+We create a simple xpath.c file
+<c:code>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
+</c:code>
+
+<r:code>
+library(RCIndex)
+  # Compute the include directories
+cflags = system("xml2-config --cflags", intern = TRUE)
+flags = strsplit(cflags, " ")[[1]]
+incs = gsub("-I", "", flags[grep("^-I", flags)])
+tu = createTU("xpath.c", incs)
+rr = getRoutines(tu)
+</r:code>
+
+
+We find the return type of xmlXPathPopNumber
+<r:code>
+xp = rr$xmlXPathPopNumber
+getName(xp$returnType)
+</r:code>
+
+
+Next, we get the type of the ctxt parameter:
+<r:code>
+cxtTy = getCanonicalType(getType(xp@params[[1]]))
+isPointerType(ctxtTy)
+</r:code>
+Importantly, it is an opaque pointer.
+</para>
+
+
+
+<para>
+To determine the return type of the function,
+we would look for the return type of xmlXPathReturnNumber().
+This is not listed in the routines.
+<r:code>
+tu2 = createTU("xpath.c", incs, options = RCIndex:::CXTranslationUnit_DetailedPreprocessingRecord)
+</r:code>
+<r:code>
+k = function() { ans = list(); function(cur, ...) if(getName(cur) == "xmlXPathReturnNumber") ans <<- c(ans, cur)}
+zz = k()
+tu2 = createTU("xpath.c", incs, options = RCIndex:::CXTranslationUnit_DetailedPreprocessingRecord)
+m = environment(zz)$ans[[1]]
+toks = getCursorTokens(m)
+getParams(toks)
+</r:code>
+
+So we would replace
+<r:code>
+xmlXPathReturnNumber(ctxt, fib(num))
+</r:code>
+with
+<r:code>
+valuePush(ctxt, xmlXPathNewFloat( fib(num)) )
+</r:code>
+So we are doing what the pre-processor is doing.
+
+</para>
+<para>
+Given the nature of the XPath wrapper functions,
+it is perhaps simplest to generate the wrapper routine
+NOT using RLLVMCompile.
+Instead, we'll write a function that takes an R
+function and some type information and generates the
+wrapper function as an LLVM Function. 
+
+
+</para>
+
+
+</section>
+
+</doc>
