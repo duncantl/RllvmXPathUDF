@@ -551,6 +551,10 @@ ll = getNodeSet(doc, "//value[ log(.) > 3.0 ]", xpathFuns = list(log = xp))
 </r:code>
 </para>
 
+<para>
+Exercise: For log(), add an error check for the argument value being positive.
+</para>
+
 </section>
 
 </article>
