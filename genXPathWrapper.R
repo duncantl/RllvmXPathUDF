@@ -17,9 +17,11 @@ if(FALSE) {
 
 genXPathWrapper =
     #
-    #
-    #
-    #
+    # For a given LLVM routine (fun), create an XPath wrapper.
+    # The wrapper pops the arguments off the XPath stack, converting them to native types
+    # and then calls fun.  It then converts the result back to an XPath object and pushes it onto the stack.
+    # We check the number of arguments in the XPath call is the same as the number of parameters expected by
+    # fun. If not, we call xmlXPathErr().
     #
 function(fun, params = getParameters(fun), retType = getReturnType(fun), module = as(fun, "Module"),
           funName = sprintf("xpath%s", getName(fun)))
@@ -84,6 +86,12 @@ function(ir, params, numExpected, module, returnBlock, origFunName)
 }
 
 popArg =
+    #
+    # Code to pop an argument from the XPath call as a native compiled type.
+    # Determine the type expected for this parameter in the wrapped routine and
+    # pop an instance of that most appropriate type from the XPath stack.
+    # Cast the resulting value to the more specific native type expected by the routine.
+    #
 function(ir, ty, ctxt, module)
 {
 
