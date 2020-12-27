@@ -1,0 +1,109 @@
+; ModuleID = 'regex.c'
+source_filename = "regex.c"
+target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-apple-macosx10.15.0"
+
+%struct.pcre2_real_match_data_8 = type opaque
+%struct.pcre2_real_code_8 = type opaque
+%struct.SEXPREC = type opaque
+%struct.pcre2_real_general_context_8 = type opaque
+%struct.pcre2_real_compile_context_8 = type opaque
+%struct._xmlXPathParserContext = type { i8*, i8*, i32, %struct._xmlXPathContext*, %struct._xmlXPathObject*, i32, i32, %struct._xmlXPathObject**, %struct._xmlXPathCompExpr*, i32, %struct._xmlNode*, i32 }
+%struct._xmlXPathContext = type { %struct._xmlDoc*, %struct._xmlNode*, i32, i32, %struct._xmlHashTable*, i32, i32, %struct._xmlXPathType*, i32, i32, %struct._xmlHashTable*, i32, i32, %struct._xmlXPathAxis*, %struct._xmlNs**, i32, i8*, i32, i32, i32, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlHashTable*, %struct._xmlXPathObject* (i8*, i8*, i8*)*, i8*, i8*, i8*, i8*, {}* (i8*, i8*, i8*)*, i8*, %struct._xmlNs**, i32, i8*, void (i8*, %struct._xmlError*)*, %struct._xmlError, %struct._xmlNode*, %struct._xmlDict*, i32, i8*, i64, i64, i32, i32, i32 }
+%struct._xmlDoc = type { i8*, i32, i8*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlDoc*, i32, i32, %struct._xmlDtd*, %struct._xmlDtd*, %struct._xmlNs*, i8*, i8*, i8*, i8*, i8*, i32, %struct._xmlDict*, i8*, i32, i32 }
+%struct._xmlDtd = type { i8*, i32, i8*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlDoc*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlDoc*, i8*, i8*, i8*, i8*, i8*, i8*, i8* }
+%struct._xmlNs = type { %struct._xmlNs*, i32, i8*, i8*, i8*, %struct._xmlDoc* }
+%struct._xmlXPathType = type { i8*, i32 (%struct._xmlXPathObject*, i32)* }
+%struct._xmlXPathAxis = type { i8*, %struct._xmlXPathObject* (%struct._xmlXPathParserContext*, %struct._xmlXPathObject*)* }
+%struct._xmlHashTable = type opaque
+%struct._xmlError = type { i32, i32, i8*, i32, i8*, i32, i8*, i8*, i8*, i32, i32, i8*, i8* }
+%struct._xmlDict = type opaque
+%struct._xmlXPathObject = type { i32, %struct._xmlNodeSet*, i32, double, i8*, i8*, i32, i8*, i32 }
+%struct._xmlNodeSet = type { i32, i32, %struct._xmlNode** }
+%struct._xmlXPathCompExpr = type opaque
+%struct._xmlNode = type { i8*, i32, i8*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlDoc*, %struct._xmlNs*, i8*, %struct._xmlAttr*, %struct._xmlNs*, i8*, i16, i16 }
+%struct._xmlAttr = type { i8*, i32, i8*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlNode*, %struct._xmlAttr*, %struct._xmlAttr*, %struct._xmlDoc*, %struct._xmlNs*, i32, i8* }
+%struct.pcre2_real_match_context_8 = type opaque
+
+@matchData = local_unnamed_addr global %struct.pcre2_real_match_data_8* null, align 8
+@pattern = local_unnamed_addr global %struct.pcre2_real_code_8* null, align 8
+
+; Function Attrs: nounwind ssp uwtable
+define %struct.SEXPREC* @R_setPattern(%struct.SEXPREC*) local_unnamed_addr #0 {
+  %2 = alloca i32, align 4
+  %3 = alloca i64, align 8
+  %4 = bitcast i32* %2 to i8*
+  call void @llvm.lifetime.start.p0i8(i64 4, i8* nonnull %4) #3
+  store i32 0, i32* %2, align 4, !tbaa !4
+  %5 = bitcast i64* %3 to i8*
+  call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %5) #3
+  store i64 0, i64* %3, align 8, !tbaa !8
+  %6 = tail call %struct.pcre2_real_match_data_8* @pcre2_match_data_create_8(i32 4, %struct.pcre2_real_general_context_8* null) #3
+  store %struct.pcre2_real_match_data_8* %6, %struct.pcre2_real_match_data_8** @matchData, align 8, !tbaa !10
+  %7 = tail call %struct.SEXPREC* @STRING_ELT(%struct.SEXPREC* %0, i64 0) #3
+  %8 = tail call i8* @R_CHAR(%struct.SEXPREC* %7) #3
+  %9 = call %struct.pcre2_real_code_8* @pcre2_compile_8(i8* %8, i64 -1, i32 0, i32* nonnull %2, i64* nonnull %3, %struct.pcre2_real_compile_context_8* null) #3
+  store %struct.pcre2_real_code_8* %9, %struct.pcre2_real_code_8** @pattern, align 8, !tbaa !10
+  %10 = call %struct.SEXPREC* @Rf_ScalarReal(double 0x43F0000000000000) #3
+  call void @llvm.lifetime.end.p0i8(i64 8, i8* nonnull %5) #3
+  call void @llvm.lifetime.end.p0i8(i64 4, i8* nonnull %4) #3
+  ret %struct.SEXPREC* %10
+}
+
+; Function Attrs: argmemonly nounwind
+declare void @llvm.lifetime.start.p0i8(i64, i8* nocapture) #1
+
+declare %struct.pcre2_real_match_data_8* @pcre2_match_data_create_8(i32, %struct.pcre2_real_general_context_8*) local_unnamed_addr #2
+
+declare %struct.pcre2_real_code_8* @pcre2_compile_8(i8*, i64, i32, i32*, i64*, %struct.pcre2_real_compile_context_8*) local_unnamed_addr #2
+
+declare i8* @R_CHAR(%struct.SEXPREC*) local_unnamed_addr #2
+
+declare %struct.SEXPREC* @STRING_ELT(%struct.SEXPREC*, i64) local_unnamed_addr #2
+
+declare %struct.SEXPREC* @Rf_ScalarReal(double) local_unnamed_addr #2
+
+; Function Attrs: argmemonly nounwind
+declare void @llvm.lifetime.end.p0i8(i64, i8* nocapture) #1
+
+; Function Attrs: nounwind ssp uwtable
+define void @do_match(%struct._xmlXPathParserContext*, i32) local_unnamed_addr #0 {
+  %3 = tail call i8* @xmlXPathPopString(%struct._xmlXPathParserContext* %0) #3
+  %4 = load %struct.pcre2_real_code_8*, %struct.pcre2_real_code_8** @pattern, align 8, !tbaa !10
+  %5 = load %struct.pcre2_real_match_data_8*, %struct.pcre2_real_match_data_8** @matchData, align 8, !tbaa !10
+  %6 = tail call i32 @pcre2_match_8(%struct.pcre2_real_code_8* %4, i8* %3, i64 -1, i64 0, i32 0, %struct.pcre2_real_match_data_8* %5, %struct.pcre2_real_match_context_8* null) #3
+  %7 = icmp sgt i32 %6, 0
+  %8 = zext i1 %7 to i32
+  %9 = tail call %struct._xmlXPathObject* @xmlXPathNewBoolean(i32 %8) #3
+  %10 = tail call i32 @valuePush(%struct._xmlXPathParserContext* %0, %struct._xmlXPathObject* %9) #3
+  ret void
+}
+
+declare i8* @xmlXPathPopString(%struct._xmlXPathParserContext*) local_unnamed_addr #2
+
+declare i32 @pcre2_match_8(%struct.pcre2_real_code_8*, i8*, i64, i64, i32, %struct.pcre2_real_match_data_8*, %struct.pcre2_real_match_context_8*) local_unnamed_addr #2
+
+declare i32 @valuePush(%struct._xmlXPathParserContext*, %struct._xmlXPathObject*) local_unnamed_addr #2
+
+declare %struct._xmlXPathObject* @xmlXPathNewBoolean(i32) local_unnamed_addr #2
+
+attributes #0 = { nounwind ssp uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "darwin-stkchk-strong-link" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "probe-stack"="___chkstk_darwin" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #1 = { argmemonly nounwind }
+attributes #2 = { "correctly-rounded-divide-sqrt-fp-math"="false" "darwin-stkchk-strong-link" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "probe-stack"="___chkstk_darwin" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #3 = { nounwind }
+
+!llvm.module.flags = !{!0, !1, !2}
+!llvm.ident = !{!3}
+
+!0 = !{i32 2, !"SDK Version", [2 x i32] [i32 10, i32 15]}
+!1 = !{i32 1, !"wchar_size", i32 4}
+!2 = !{i32 7, !"PIC Level", i32 2}
+!3 = !{!"Apple clang version 11.0.0 (clang-1100.0.33.17)"}
+!4 = !{!5, !5, i64 0}
+!5 = !{!"int", !6, i64 0}
+!6 = !{!"omnipotent char", !7, i64 0}
+!7 = !{!"Simple C/C++ TBAA"}
+!8 = !{!9, !9, i64 0}
+!9 = !{!"long", !6, i64 0}
+!10 = !{!11, !11, i64 0}
+!11 = !{!"any pointer", !6, i64 0}
