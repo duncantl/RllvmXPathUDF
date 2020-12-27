@@ -1,0 +1,7 @@
+<doc>
+  <t tag="a">bar</t>
+  <t tag="foo">foo</t>
+  <other tag="abc">
+    <t tag="z">fool</t>
+  </other>
+</doc>

@@ -1,2 +1,2 @@
-PKG_CPPFLAGS=$(shell xml2-config --cflags)
-PKG_LIBS=$(shell xml2-config --libs)
+PKG_CPPFLAGS=$(shell xml2-config --cflags)  $(pkg-config --cflags libpcre2-posix)
+PKG_LIBS=$(shell xml2-config --libs)  $(pkg-config --libs libpcre2-posix)
