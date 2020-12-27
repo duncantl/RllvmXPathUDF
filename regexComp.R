@@ -13,6 +13,8 @@ ds = getDataStructures(tu)
 }
 
 
+DEBUG = FALSE
+
 # The pattern we will look for. We are hard-coding the value  in this version.
 # It is probably easier to allow the R user to specify this and hence change it as we did in regex.c
 # This is because we don't have to work with string literals but directly with pointers from R.
@@ -41,8 +43,9 @@ pcre2_match_data_create = Function("pcre2_match_data_create_8", pointerType(real
 
 iptrType = pointerType(Int32Type)
 pcre2_compile = Function("pcre2_compile_8", pointerType(real_code),
-                          list(StringType, Int64Type, Int32Type, iptrType, iptrType, vptrType), module = m)
+                          list(StringType, Int64Type, Int32Type, iptrType, pointerType(Int64Type), vptrType), module = m)
 
+if(DEBUG)
 printf = Function("printf", Int32Type, list(StringType), module = m, varArgs = TRUE)
 
 
@@ -74,10 +77,20 @@ setUnnamedAddr(rxv, "Local")
 #crx = ir$createCall(pcre2_compile, rx, ir$createConstant(nchar(regex)), zero, null32, null32, null)
 #Works but we'll use -1L for PCRE2_ZERO_TERMINATED instead of calling strlen().
 # crx = ir$createCall(pcre2_compile, ir$createGEP(rxv, c(0L, 0L)), ir$createConstant(nchar(regex), Int64Type), zero, null32, null32, null)
-crx = ir$createCall(pcre2_compile, ir$createGEP(rxv, c(0L, 0L)), ir$createConstant(-1L, Int64Type), zero, null32, null32, null)
 
-fmt3 = createGlobalVariable("printf.fmt3", m, val = ir$createConstant("pattern = %p\n"), constant = TRUE, align = 1L)
-ir$createCall(printf, ir$createGEP(fmt3, c(0L, 0L)), crx)
+err = ir$createLocalVariable(Int32Type, "err")
+errOff = ir$createLocalVariable(Int64Type, "errOff")
+ir$createStore(ir$createConstant(0L), err)
+ir$createStore(ir$createConstant(0L, Int64Type), errOff)
+
+#crx = ir$createCall(pcre2_compile, ir$createGEP(rxv, c(0L, 0L)), ir$createConstant(-1L, Int64Type), zero, null32, null32, null)
+crx = ir$createCall(pcre2_compile, ir$createGEP(rxv, c(0L, 0L)), ir$createConstant(-1L, Int64Type), zero, err, errOff, null)
+
+
+if(DEBUG) {
+  fmt3 = createGlobalVariable("printf.fmt3", m, val = ir$createConstant("pattern = %p, err = %d\n"), constant = TRUE, align = 1L)
+  ir$createCall(printf, ir$createGEP(fmt3, c(0L, 0L)), crx, err)
+}
 
 ir$createStore(crx, pattern)
 ir$createReturn()
@@ -89,9 +102,12 @@ ir$createReturn()
 f1 = simpleFunction("do_match", Int1Type, str = StringType, mod = m)
 ir = f1$ir
 
-# Debugging
+
+if(DEBUG) {
 fmt1 = createGlobalVariable("printf.fmt1", m, val = ir$createConstant("string = %s\n"), constant = TRUE, align = 1L)
 ir$createCall(printf, ir$createGEP(fmt1, c(0L, 0L)), f1$params$str)
+}
+
 
 # Instead of strlen() call, we could use PCRE2_ZERO_TERMINATED which is ~ 0   -1 as a 64 bit integer
 #len = ir$createCall(strlen, f1$params$str)
@@ -99,16 +115,19 @@ len = ir$createConstant(-1L, Int64Type)
 ans = ir$createCall(pcre2_match, ir$createLoad(pattern), f1$params$str, len, zero, zero, ir$createLoad(matchData), null)
 ans2 = ir$createICmp(ICMP_SGT, ans, zero)
 
+if(DEBUG) {
 fmt2 = createGlobalVariable("printf.fmt2", m, val = ir$createConstant("ans = %d, pattern = %p\n"), constant = TRUE, align = 1L)
 ir$createCall(printf, ir$createGEP(fmt2, c(0L, 0L)), ans2, ir$createLoad(pattern))
+}
 
 ir$createReturn(ans2)
 
-if(FALSE) {
-    wrapper = genXPathWrapper(f1, retType = Int1Type, module = m, funName = "xpath_grepl")
-}
+
+wrapper = genXPathWrapper(f1$fun, retType = Int1Type, module = m, funName = "xpath_grepl")
+
 
 verifyModule(m)
+
 
 if(FALSE) {
     # Load the native libaries and pass the relevant address to LLVM
@@ -116,9 +135,20 @@ if(FALSE) {
     pcre2 = dyn.load("/usr/local/lib/libpcre2-8.0.dylib")
     llvmAddSymbol("printf", "strlen", pcre2_match = "pcre2_match_8", pcre2_compile = "pcre2_compile_8", pcre2_match_data_create = "pcre2_match_data_create_8")
 
+
+    # Essential that both calls be given ee - and the same ee.
+    # If you leave it out of the second call, pattern is NULL and the code just returns 0.
     ee = ExecutionEngine(m)
     .llvm(m$initialize, .ee = ee)
-    .llvm(m$do_match, "xyz")
+    .llvm(m$do_match, "xyz", .ee = ee)
+    .llvm(m$do_match, "a fool and his money are soon parted", .ee = ee)
+
+
+    library(XML)
+    doc = xmlParse("doc3.xml")
+
+    rref = getPointerToFunction(m$xpath_grepl, ee)@ref
+    els = getNodeSet(doc, "//text()[grep_p(string(.))]/..", xpathFuns = list(grep_p = rref))    
 }
 
 
