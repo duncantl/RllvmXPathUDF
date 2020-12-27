@@ -97,17 +97,17 @@ function(ir, ty, ctxt, module)
 
     # Add the definition for xmlXPathPop....
     #XXX generalize
-    if(identical(ty, Int1Type))
+    if(sameType(ty, Int1Type))
        pop = Function("xmlXPathPopBoolean", Int32Type, list(pointerType(VoidType)), module = module)        
-    else if(isIntegerType(ty) || identical(ty, DoubleType)) 
+    else if(isIntegerType(ty) || sameType(ty, DoubleType)) 
        pop = Function("xmlXPathPopNumber", DoubleType, list(pointerType(VoidType)), module = module)
-    else if(identical(StringType, ty))
-       pop = Function("xmlXPathPopString", pointerType(Int32Type), list(pointerType(VoidType)), module = module)
+    else if(sameType(StringType, ty))
+       pop = Function("xmlXPathPopString", pointerType(Int8Type), list(pointerType(VoidType)), module = module)
     else  #XXX not correct default.
         pop = Function("xmlXPathPopNodeSet", pointerType(Int32Type), list(pointerType(VoidType)), module = module)                
    k = createCall(ir, pop, ctxt)
 
-   if(!identical(getType(k) , ty)) {
+   if(!sameType(getType(k) , ty)) {
        #XX generalize
      createCast(ir, Rllvm:::FPToSI, k, ty)
    } else
@@ -135,10 +135,9 @@ function(ir, val, retType, ctxt, module)
         stop("no matching type")
 
     ty = getType(getParameters(xnew)[[1]])
-    if(!identical(ty, retType)) {
-        #XXX  make more general
-        val = createCast(ir, Rllvm:::SIToFP, val, ty)
-    }
+    if(!sameType(ty, retType)) 
+       val = makeCast(val, retType, ty, ir)
+
 
      # Create the new XPath object
     xval = createCall(ir, xnew, val)
@@ -146,4 +145,22 @@ function(ir, val, retType, ctxt, module)
     valuePush = Function("valuePush", Int32Type, list(pointerType(VoidType), pointerType(VoidType)), module = module)
      # Call valuePush() with the xmlXPath context and the newly created XPath object
     createCall(ir, valuePush, ctxt, xval)
+}
+
+
+makeCast =
+    #XXX Still needs to be more general.
+function(value, ty, targetType, ir)
+{
+    types = list(ty, targetType)
+    w = sapply(types, isIntegerType)
+    if(all(w)) {
+        bits = sapply(types, getIntegerBitWidth)
+        if(bits[1] <= bits[2])
+            return(ir$createZExt(value, targetType))
+        else
+            stop("problems")
+    } else
+        op = Rllvm:::SIToFP
+    createCast(ir, op, value, targetType) 
 }
