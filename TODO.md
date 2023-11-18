@@ -1,3 +1,5 @@
++ find where our libraries are looking for header files.
+
 + genXPathWrapper.R - coercing int1 to floating point!
 
 +  in genXPathWrapper.R, if declare xmlXPathPopString with return type StringType (rather than
